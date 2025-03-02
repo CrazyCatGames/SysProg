@@ -1,7 +1,9 @@
-#include <Windows.h>
-#include <pthread.h>
-#include <semaphore.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+#include <pthread.h>
 
 #define NUM_PHILS 5
 #define LEFT ((phil_id + 4) % NUM_PHILS)
@@ -12,8 +14,7 @@
 
 int state[NUM_PHILS];
 int times = 0;
-sem_t mutex;
-sem_t phile_thread[NUM_PHILS];
+int sem_id;
 
 void* Philosopher(void* phil_id);
 void CheckForks(int phil_id);
@@ -25,10 +26,15 @@ int main() {
 	pthread_t thread_id[NUM_PHILS];
 	int phils[NUM_PHILS] = {0, 1, 2, 3, 4};
 
-	sem_init(&mutex, 0, 1);
+	sem_id = semget(IPC_PRIVATE, NUM_PHILS + 1, IPC_CREAT | 0666);
+	if (sem_id == -1) {
+		fprintf(stderr, "Error of creating sem");
+		return 1;
+	}
 
+	semctl(sem_id, NUM_PHILS, SETVAL, 1);
 	for (i = 0; i < NUM_PHILS; i++) {
-		sem_init(&phile_thread[i], 0, 0);
+		semctl(sem_id, i, SETVAL, 0);
 	}
 
 	for (i = 0; i < NUM_PHILS; i++) {
@@ -36,54 +42,61 @@ int main() {
 		printf("Philosopher %d is thinking\n", i + 1);
 	}
 
-	printf("\n");
 	for (i = 0; i < NUM_PHILS; i++) {
 		pthread_join(thread_id[i], NULL);
 	}
+
+	semctl(sem_id, 0, IPC_RMID);
+	return 0;
 }
 
 void* Philosopher(void* phil_id) {
+	int* i = (int*)phil_id;
 	while (times < 50) {
-		int* i = phil_id;
-		Sleep(100);
+		usleep(100000);
 		TakeFork(*i);
-		Sleep(100);
+		usleep(100000);
 		PutFork(*i);
 		times++;
 	}
+	return NULL;
 }
 
 void TakeFork(int phil_id) {
-	sem_wait(&mutex);
+	struct sembuf op_dec = {NUM_PHILS, -1, 0};
+	semop(sem_id, &op_dec, 1);
 
 	state[phil_id] = HUNGRY;
 	printf("Philosopher %d is Hungry\n", phil_id + 1);
 	CheckForks(phil_id);
 
-	sem_post(&mutex);
-	sem_wait(&phile_thread[phil_id]);
+	struct sembuf op_inc = {NUM_PHILS, 1, 0};
+	semop(sem_id, &op_inc, 1);
 
-	Sleep(50);
+	struct sembuf op_wait = {phil_id, -1, 0};
+	semop(sem_id, &op_wait, 1);
+	usleep(50000);
 }
 
 void PutFork(int phil_id) {
-	sem_wait(&mutex);
+	struct sembuf op_dec = {NUM_PHILS, -1, 0};
+	semop(sem_id, &op_dec, 1);
 
 	state[phil_id] = THINKING;
 	printf("Philosopher %d is putting forks %d and %d down and thinking now\n", phil_id + 1, LEFT + 1, phil_id + 1);
 	CheckForks(LEFT);
 	CheckForks(RIGHT);
 
-	sem_post(&mutex);
+	struct sembuf op_inc = {NUM_PHILS, 1, 0};
+	semop(sem_id, &op_inc, 1);
 }
 
 void CheckForks(int phil_id) {
 	if (state[phil_id] == HUNGRY && state[LEFT] != EATING && state[RIGHT] != EATING) {
 		state[phil_id] = EATING;
+		printf("Philosopher %d is taking forks %d and %d and eating now\n", phil_id + 1, LEFT + 1, phil_id + 1);
 
-		printf("Philosopher %d takes forks %d and %d\n", phil_id + 1, LEFT + 1, phil_id + 1);
-		printf("Philosopher %d is Eating\n", phil_id + 1);
-
-		sem_post(&phile_thread[phil_id]);
+		struct sembuf op_post = {phil_id, 1, 0};
+		semop(sem_id, &op_post, 1);
 	}
 }
