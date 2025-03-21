@@ -5,57 +5,75 @@ User *users = NULL;
 int user_count = 0;
 int user_capacity = INITIAL_USER_CAPACITY;
 
+int sem_id = 0;
+
+union semun {
+	int val;
+	struct semid_ds *buf;
+	unsigned short *array;
+};
+
 int main() {
-	system("chcp 65001");
 	int choice = 0;
 	pthread_t shell_thread;
 	users = malloc(user_capacity * sizeof(User));
 	if (!users) {
-		fprintf(stderr, "Alloc memory errror.");
+		HandlePrint(1,"Alloc memory errror.");
+		return 1;
+	}
+
+	sem_id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
+	if (sem_id == -1) {
+		HandlePrint(1, "Failed to create semaphore.");
+		return 1;
+	}
+	union semun sem_union;
+	sem_union.val = 1;
+	if (semctl(sem_id, 0, SETVAL, sem_union) == -1) {
+		HandlePrint(1, "Failed to initialize semaphore.");
 		return 1;
 	}
 
 	while (1) {
 		if (choice == -1) break;
 
-		printf("\n1. Registration\n2. Login\n3. Exit\nChoice: ");
+		HandlePrint(0, "1. Registration\n2. Login\n3. Exit\nChoice: ");
 
 		if (scanf("%d", &choice) != 1) {
-			printf("Error: Choose correct number.\n");
-			while (getchar() != '\n')
-				;
+			HandlePrint(0, "Error: Choose correct number.\n");
 			continue;
 		}
 
 		switch (choice) {
 			case 1:
-				if (RegisterUser() != REG_SUCCESS) {
-					fprintf(stderr, "Alloc memory error.\n");
+				OPT tmp = RegisterUser();
+				if (tmp == ERROR_MEMORY_ALLOC) {
+					HandlePrint(1,"Alloc memory error.\n");
 					FreeUsers();
-					break;
+					choice = -1;
 				}
 				break;
 			case 2:
 				if (!user_count){
-					printf("No users exist.\n");
+					HandlePrint(0, "No users exist.\n");
 					break;
 				}
 				if (AuthenticateUser() == AUTH_SUCCESS) {
-					printf("Login successful.\n");
+					HandlePrint(0, "Login successful.\n");
 					pthread_create(&shell_thread, NULL, Shell, NULL);
 					pthread_join(shell_thread, NULL);
 					current_user = NULL;
 				}else {
-					printf("Login failed.\n");
+					HandlePrint(0, "Login failed. Incorrect login or PIN.\n");
 				}
 				break;
 			case 3:
-				printf("Exiting...\n");
+				HandlePrint(0, "Exiting...\n");
 				FreeUsers();
 				choice = -1;
 				break;
 			default:
-				printf("Incorrect choice.\n");
+				HandlePrint(0, "Incorrect choice.\n");
 		}
 	}
 	return 0;

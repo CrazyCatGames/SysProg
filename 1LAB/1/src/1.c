@@ -28,6 +28,13 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 	return pos;
 }
 
+void HandlePrint(char code, const char *format, ...){
+	va_list args;
+	va_start(args, format);
+	vfprintf(code ? stderr : stdout, format, args);
+	va_end(args);
+}
+
 void FreeUsers() {
 	free(users);
 }
@@ -37,11 +44,11 @@ void GetValidData(char *username, int *pin) {
 	char pin_input[10];
 
 	while (1) {
-		printf("Enter login (max 6 symbols, latin letters and numbers): ");
+		HandlePrint(0, "Enter login (max 6 symbols, latin letters and numbers): ");
 		scanf("%9s", input);
 
 		if (strlen(input) > MAX_USERNAME) {
-			printf("Error: length of username mustn't be more than 6.\n");
+			HandlePrint(0,"Error: length of username mustn't be more than 6.\n");
 			continue;
 		}
 
@@ -54,7 +61,7 @@ void GetValidData(char *username, int *pin) {
 		}
 
 		if (!valid) {
-			printf("Error: Login must has only latin letters and numbers.\n");
+			HandlePrint(0,"Error: Login must has only latin letters and numbers.\n");
 			continue;
 		}
 
@@ -63,7 +70,7 @@ void GetValidData(char *username, int *pin) {
 	}
 
 	while (1) {
-		printf("Enter PIN-code (0-100000): ");
+		HandlePrint(0, "Enter PIN-code (0-100000): ");
 		scanf("%9s", pin_input);
 		while (getchar() != '\n')
 			;
@@ -77,7 +84,7 @@ void GetValidData(char *username, int *pin) {
 		}
 
 		if (!valid) {
-			printf("Error: PIN-code must has only numbers.\n");
+			HandlePrint(0, "Error: PIN-code must has only numbers.\n");
 			continue;
 		}
 
@@ -85,7 +92,7 @@ void GetValidData(char *username, int *pin) {
 		*pin = (int)strtod(pin_input, &end);
 
 		if (*pin <= 0 || *pin >= 100000) {
-			printf("Error: PIN-code must be from 0 to 100000.\n");
+			HandlePrint(0,"Error: PIN-code must be from 0 to 100000.\n");
 			continue;
 		}
 
@@ -94,6 +101,18 @@ void GetValidData(char *username, int *pin) {
 }
 
 OPT RegisterUser() {
+	char temp_username[MAX_USERNAME];
+	int temp_pin;
+
+	GetValidData(temp_username, &temp_pin);
+
+	for (int i = 0; i < user_count; i++) {
+		if (strcmp(users[i].username, temp_username) == 0) {
+			HandlePrint(0, "User with login '%s' already exists.\n", temp_username);
+			return INCORRECT_DATA;
+		}
+	}
+
 	if (user_count >= user_capacity) {
 		user_capacity *= 2;
 		User *new_users = realloc(users, user_capacity * sizeof(User));
@@ -103,10 +122,11 @@ OPT RegisterUser() {
 		users = new_users;
 	}
 
-	GetValidData(users[user_count].username, &users[user_count].pin);
+	strcpy(users[user_count].username, temp_username);
+	users[user_count].pin = temp_pin;
 	users[user_count].sanctions = -1;
 
-	printf("User %s registered successful!\n", users[user_count++].username);
+	HandlePrint(0, "User %s registered successful!\n", users[user_count++].username);
 	return REG_SUCCESS;
 }
 
@@ -123,7 +143,6 @@ OPT AuthenticateUser() {
 		}
 	}
 
-	printf("Incorrect login or PIN.\n");
 	return AUTH_FAIL;
 }
 
@@ -132,35 +151,35 @@ void *Shell(void *args) {
 	size_t buffer_size = 0;
 	int current_commands = 0;
 
-	printf("Добро пожаловать, %s!\n", current_user->username);
+	HandlePrint(0, "Welcome, %s!\n", current_user->username);
 
 	while (1) {
 		if (current_user->sanctions != -1 && current_commands >= current_user->sanctions) {
-			printf("Request limit reached. Logging out.\n");
+			HandlePrint(0, "Request limit reached. Logging out.\n");
 			break;
 		}
 
-		printf("> ");
+		HandlePrint(0,"> ");
 		ssize_t len = getline(&command, &buffer_size, stdin);
 
 		if (len == -1) {
-			printf("Error of reading command.\n");
+			HandlePrint(1, "Error of reading command.\n");
 			continue;
 		}
 
-		if (command[len - 1] == '\n') {
-			command[len - 1] = '\0';
+		if (command[len] == '\n') {
+			command[len] = '\0';
 		}
 
 		if (strcmp(command, "Logout") == 0) {
-			printf("Logout...\n");
+			HandlePrint(0,"Logout...\n");
 			break;
 		}
 
 		if (strcmp(command, "Time") == 0) {
 			time_t now = time(NULL);
 			struct tm *tm_info = localtime(&now);
-			printf("Текущее время: %02d:%02d:%02d\n",
+			HandlePrint(0, "Current time: %02d:%02d:%02d\n",
 				   tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
 			current_commands++;
 			continue;
@@ -169,7 +188,7 @@ void *Shell(void *args) {
 		if (strcmp(command, "Date") == 0) {
 			time_t now = time(NULL);
 			struct tm *tm_info = localtime(&now);
-			printf("Current date: %02d-%02d-%04d\n",
+			HandlePrint(0, "Current date: %02d-%02d-%04d\n",
 				   tm_info->tm_mday, tm_info->tm_mon + 1, tm_info->tm_year + 1900);
 			current_commands++;
 			continue;
@@ -179,18 +198,18 @@ void *Shell(void *args) {
 			int year, month, day;
 			char flag[4];
 
-			if (sscanf(command + 8, "%2d-%2d-%4d %4s", &day, &month, &year, flag) != 4) {
-				printf("Error: command format 'Howmuch DD-MM-YYYY -s/-m/-h/-y'\n");
+			if (sscanf(command + 8, "%2d-%2d-%4d %4s\n", &day, &month, &year, flag) != 4) {
+				HandlePrint(0, "Error: command format 'Howmuch DD-MM-YYYY -s/-m/-h/-y'\n");
 				continue;
 			}
 
 			if (strlen(flag) != 2) {
-				printf("Unknown flag %s\n", flag);
+				HandlePrint(0, "Unknown flag %s\n", flag);
 				continue;
 			}
 
 			if (month < 1 || month > 12 || day < 1 || day > 31) {
-				printf("Error: incorrect date.\n");
+				HandlePrint(0, "Error: incorrect date.\n");
 				continue;
 			}
 
@@ -201,7 +220,7 @@ void *Shell(void *args) {
 			time_t input_time = mktime(&input_date);
 
 			if (input_time == -1) {
-				printf("Error: impossible to check date.\n");
+				HandlePrint(0, "Error: impossible to check date.\n");
 				continue;
 			}
 
@@ -209,20 +228,20 @@ void *Shell(void *args) {
 			double diff = difftime(now, input_time);
 
 			if (diff < 0) {
-				printf("Error: input date in the future.\n");
+				HandlePrint(0, "Error: input date in the future.\n");
 				continue;
 			}
 
 			if (strcmp(flag, "-s") == 0) {
-				printf("Difference: %.0f seconds\n", diff);
+				HandlePrint(0, "Difference: %.0f seconds\n", diff);
 			} else if (strcmp(flag, "-m") == 0) {
-				printf("Difference: %.2f minutes\n", diff / 60);
+				HandlePrint(0, "Difference: %.2f minutes\n", diff / 60);
 			} else if (strcmp(flag, "-h") == 0) {
-				printf("Difference: %.2f hours\n", diff / 3600);
+				HandlePrint(0,"Difference: %.2f hours\n", diff / 3600);
 			} else if (strcmp(flag, "-y") == 0) {
-				printf("Difference: %.2f years\n", diff / 31536000);
+				HandlePrint(0,"Difference: %.2f years\n", diff / 31536000);
 			} else {
-				printf("Error: unknown flag '%s'. Use -s/-m/-h/-y.\n", flag);
+				HandlePrint(0,"Error: unknown flag '%s'. Use -s/-m/-h/-y.\n", flag);
 			}
 			current_commands++;
 			continue;
@@ -233,13 +252,13 @@ void *Shell(void *args) {
 			int limit, code;
 
 			if (sscanf(command + 10, "%6s %d", username, &limit) != 2) {
-				printf("Error: use 'Sanctions <username> <number>'.\n");
+				HandlePrint(0,"Error: use 'Sanctions <username> <number>'.\n");
 				continue;
 			}
 
-			printf("Error confirm code: ");
+			HandlePrint(0, "Enter confirm code: ");
 			if (scanf("%d", &code) != 1 || code != 12345) {
-				printf("Error: incorrect code.\n");
+				HandlePrint(0,"Error: incorrect code.\n");
 				while (getchar() != '\n')
 					;
 				continue;
@@ -247,27 +266,38 @@ void *Shell(void *args) {
 			while (getchar() != '\n')
 				;
 
+			struct sembuf sem_lock = {0, -1, 0};
+			struct sembuf sem_unlock = {0, 1, 0};
+
+			if (semop(sem_id, &sem_lock, 1) == -1) {
+				perror("semop lock failed");
+			}
+
 			if (sscanf(command + 10, "%6s %d", username, &limit) == 2) {
 				int found = 0;
 				for (int i = 0; i < user_count; i++) {
 					if (strcmp(users[i].username, username) == 0) {
 						users[i].sanctions = limit;
-						printf("Set limit of commands for %s: %d\n", username, limit);
+						HandlePrint(0, "Set limit of commands for %s: %d\n", username, limit);
 						found = 1;
 						break;
 					}
 				}
 				if (!found) {
-					printf("Error: user '%s' not found.\n", username);
+					HandlePrint(0, "Error: user '%s' not found.\n", username);
 				}
+
 			} else {
-				printf("Error: use format 'Sanctions <username> <number>'.\n");
+				HandlePrint(0, "Error: use format 'Sanctions <username> <number>'.\n");
+			}
+			if (semop(sem_id, &sem_unlock, 1) == -1) {
+				perror("semop unlock failed");
 			}
 			current_commands++;
 			continue;
 		}
 
-		printf("Error: unknown command '%s'.\n", command);
+		HandlePrint(0, "Error: unknown command '%s'.\n", command);
 	}
 
 	free(command);

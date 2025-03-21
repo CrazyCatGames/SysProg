@@ -9,7 +9,9 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
-
+#include <stdarg.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 #define INITIAL_USER_CAPACITY 10
 #define MAX_USERNAME 7
@@ -26,7 +28,6 @@ typedef enum OPT {
 	INCORRECT_DATA,
 	ERROR_MEMORY_ALLOC,
 	REG_SUCCESS
-
 } OPT;
 
 extern User *users;
@@ -34,6 +35,9 @@ extern User *current_user;
 extern int user_count;
 extern int user_capacity;
 
+extern int sem_id;
+
+void HandlePrint(char code, const char* string, ...);
 OPT RegisterUser();
 OPT AuthenticateUser();
 void* Shell(void *args);
