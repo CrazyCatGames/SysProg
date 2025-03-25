@@ -150,8 +150,8 @@ void *Shell(void *args) {
 			continue;
 		}
 
-		if (command[len] == '\n') {
-			command[len] = '\0';
+		if (command[len - 1] == '\n') {
+			command[len - 1] = '\0';
 		}
 
 		if (strcmp(command, "Logout") == 0) {
