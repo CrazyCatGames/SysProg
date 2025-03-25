@@ -16,9 +16,9 @@ union semun {
 int main() {
 	int choice = 0;
 	pthread_t shell_thread;
-	users = malloc(user_capacity * sizeof(User));
+	users = (User *) malloc(user_capacity * sizeof(User));
 	if (!users) {
-		HandlePrint(1,"Alloc memory errror.");
+		HandlePrint(1, "Alloc memory errror.");
 		return 1;
 	}
 
@@ -48,13 +48,13 @@ int main() {
 			case 1:
 				OPT tmp = RegisterUser();
 				if (tmp == ERROR_MEMORY_ALLOC) {
-					HandlePrint(1,"Alloc memory error.\n");
-					FreeUsers();
+					HandlePrint(1, "Alloc memory error.\n");
+					free(users);
 					choice = -1;
 				}
 				break;
 			case 2:
-				if (!user_count){
+				if (!user_count) {
 					HandlePrint(0, "No users exist.\n");
 					break;
 				}
@@ -63,13 +63,13 @@ int main() {
 					pthread_create(&shell_thread, NULL, Shell, NULL);
 					pthread_join(shell_thread, NULL);
 					current_user = NULL;
-				}else {
+				} else {
 					HandlePrint(0, "Login failed. Incorrect login or PIN.\n");
 				}
 				break;
 			case 3:
 				HandlePrint(0, "Exiting...\n");
-				FreeUsers();
+				free(users);
 				choice = -1;
 				break;
 			default:

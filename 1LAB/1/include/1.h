@@ -1,5 +1,4 @@
-#ifndef INC_1_1_H
-#define INC_1_1_H
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +15,7 @@
 #define INITIAL_USER_CAPACITY 10
 #define MAX_USERNAME 7
 
-typedef struct {
+typedef struct User {
 	char username[MAX_USERNAME];
 	int pin;
 	int sanctions;
@@ -41,6 +40,3 @@ void HandlePrint(char code, const char* string, ...);
 OPT RegisterUser();
 OPT AuthenticateUser();
 void* Shell(void *args);
-void FreeUsers();
-
-#endif

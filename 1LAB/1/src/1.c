@@ -28,27 +28,31 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 	return pos;
 }
 
-void HandlePrint(char code, const char *format, ...){
+void HandlePrint(char code, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	vfprintf(code ? stderr : stdout, format, args);
 	va_end(args);
 }
 
-void FreeUsers() {
-	free(users);
-}
-
 void GetValidData(char *username, int *pin) {
-	char input[10];
+	char input[10];// Буфер с запасом
 	char pin_input[10];
 
 	while (1) {
 		HandlePrint(0, "Enter login (max 6 symbols, latin letters and numbers): ");
-		scanf("%9s", input);
+
+		if (scanf("%9s", input) != 1) {
+			HandlePrint(0, "Error: input failed.\n");
+			while (getchar() != '\n')
+				;
+			continue;
+		}
+		while (getchar() != '\n')
+			;
 
 		if (strlen(input) > MAX_USERNAME) {
-			HandlePrint(0,"Error: length of username mustn't be more than 6.\n");
+			HandlePrint(0, "Error: length of username mustn't be more than 6.\n");
 			continue;
 		}
 
@@ -61,7 +65,7 @@ void GetValidData(char *username, int *pin) {
 		}
 
 		if (!valid) {
-			HandlePrint(0,"Error: Login must has only latin letters and numbers.\n");
+			HandlePrint(0, "Error: Login must contain only latin letters and numbers.\n");
 			continue;
 		}
 
@@ -71,7 +75,13 @@ void GetValidData(char *username, int *pin) {
 
 	while (1) {
 		HandlePrint(0, "Enter PIN-code (0-100000): ");
-		scanf("%9s", pin_input);
+
+		if (scanf("%9s", pin_input) != 1) {
+			HandlePrint(0, "Error: input failed.\n");
+			while (getchar() != '\n')
+				;
+			continue;
+		}
 		while (getchar() != '\n')
 			;
 
@@ -84,15 +94,15 @@ void GetValidData(char *username, int *pin) {
 		}
 
 		if (!valid) {
-			HandlePrint(0, "Error: PIN-code must has only numbers.\n");
+			HandlePrint(0, "Error: PIN-code must contain only numbers.\n");
 			continue;
 		}
 
 		char *end;
-		*pin = (int)strtod(pin_input, &end);
+		*pin = (int) strtol(pin_input, &end, 10);
 
 		if (*pin <= 0 || *pin >= 100000) {
-			HandlePrint(0,"Error: PIN-code must be from 0 to 100000.\n");
+			HandlePrint(0, "Error: PIN-code must be from 0 to 100000.\n");
 			continue;
 		}
 
@@ -115,7 +125,7 @@ OPT RegisterUser() {
 
 	if (user_count >= user_capacity) {
 		user_capacity *= 2;
-		User *new_users = realloc(users, user_capacity * sizeof(User));
+		User *new_users = (User *) realloc(users, user_capacity * sizeof(User));
 		if (!new_users) {
 			return ERROR_MEMORY_ALLOC;
 		}
@@ -159,7 +169,7 @@ void *Shell(void *args) {
 			break;
 		}
 
-		HandlePrint(0,"> ");
+		HandlePrint(0, "> ");
 		ssize_t len = getline(&command, &buffer_size, stdin);
 
 		if (len == -1) {
@@ -172,7 +182,7 @@ void *Shell(void *args) {
 		}
 
 		if (strcmp(command, "Logout") == 0) {
-			HandlePrint(0,"Logout...\n");
+			HandlePrint(0, "Logout...\n");
 			break;
 		}
 
@@ -180,7 +190,7 @@ void *Shell(void *args) {
 			time_t now = time(NULL);
 			struct tm *tm_info = localtime(&now);
 			HandlePrint(0, "Current time: %02d:%02d:%02d\n",
-				   tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
+						tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
 			current_commands++;
 			continue;
 		}
@@ -189,19 +199,21 @@ void *Shell(void *args) {
 			time_t now = time(NULL);
 			struct tm *tm_info = localtime(&now);
 			HandlePrint(0, "Current date: %02d-%02d-%04d\n",
-				   tm_info->tm_mday, tm_info->tm_mon + 1, tm_info->tm_year + 1900);
+						tm_info->tm_mday, tm_info->tm_mon + 1, tm_info->tm_year + 1900);
 			current_commands++;
 			continue;
 		}
 
 		if (strncmp(command, "Howmuch ", 8) == 0) {
 			int year, month, day;
-			char flag[4];
+			char flag[4], year_str[6];
 
-			if (sscanf(command + 8, "%2d-%2d-%4d %4s\n", &day, &month, &year, flag) != 4) {
+			if (sscanf(command + 8, "%2d-%2d-%s %3s\n", &day, &month, year_str, flag) != 4 || strlen(year_str) > 4) {
 				HandlePrint(0, "Error: command format 'Howmuch DD-MM-YYYY -s/-m/-h/-y'\n");
 				continue;
 			}
+
+			year = atoi(year_str);
 
 			if (strlen(flag) != 2) {
 				HandlePrint(0, "Unknown flag %s\n", flag);
@@ -237,11 +249,11 @@ void *Shell(void *args) {
 			} else if (strcmp(flag, "-m") == 0) {
 				HandlePrint(0, "Difference: %.2f minutes\n", diff / 60);
 			} else if (strcmp(flag, "-h") == 0) {
-				HandlePrint(0,"Difference: %.2f hours\n", diff / 3600);
+				HandlePrint(0, "Difference: %.2f hours\n", diff / 3600);
 			} else if (strcmp(flag, "-y") == 0) {
-				HandlePrint(0,"Difference: %.2f years\n", diff / 31536000);
+				HandlePrint(0, "Difference: %.2f years\n", diff / 31536000);
 			} else {
-				HandlePrint(0,"Error: unknown flag '%s'. Use -s/-m/-h/-y.\n", flag);
+				HandlePrint(0, "Error: unknown flag '%s'. Use -s/-m/-h/-y.\n", flag);
 			}
 			current_commands++;
 			continue;
@@ -251,14 +263,14 @@ void *Shell(void *args) {
 			char username[MAX_USERNAME + 1];
 			int limit, code;
 
-			if (sscanf(command + 10, "%6s %d", username, &limit) != 2) {
-				HandlePrint(0,"Error: use 'Sanctions <username> <number>'.\n");
+			if (sscanf(command + 10, "%6s %d", username, &limit) != 2 || limit < 0 || limit > 1000) {
+				HandlePrint(0, "Error: use 'Sanctions <username> <number (1-1000)>'.\n");
 				continue;
 			}
 
 			HandlePrint(0, "Enter confirm code: ");
 			if (scanf("%d", &code) != 1 || code != 12345) {
-				HandlePrint(0,"Error: incorrect code.\n");
+				HandlePrint(0, "Error: incorrect code.\n");
 				while (getchar() != '\n')
 					;
 				continue;
@@ -273,23 +285,19 @@ void *Shell(void *args) {
 				perror("semop lock failed");
 			}
 
-			if (sscanf(command + 10, "%6s %d", username, &limit) == 2) {
-				int found = 0;
-				for (int i = 0; i < user_count; i++) {
-					if (strcmp(users[i].username, username) == 0) {
-						users[i].sanctions = limit;
-						HandlePrint(0, "Set limit of commands for %s: %d\n", username, limit);
-						found = 1;
-						break;
-					}
+			int found = 0;
+			for (int i = 0; i < user_count; i++) {
+				if (strcmp(users[i].username, username) == 0) {
+					users[i].sanctions = limit;
+					HandlePrint(0, "Set limit of commands for %s: %d\n", username, limit);
+					found = 1;
+					break;
 				}
-				if (!found) {
-					HandlePrint(0, "Error: user '%s' not found.\n", username);
-				}
-
-			} else {
-				HandlePrint(0, "Error: use format 'Sanctions <username> <number>'.\n");
 			}
+			if (!found) {
+				HandlePrint(0, "Error: user '%s' not found.\n", username);
+			}
+
 			if (semop(sem_id, &sem_unlock, 1) == -1) {
 				perror("semop unlock failed");
 			}
