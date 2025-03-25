@@ -1,32 +1,5 @@
 #include "../include/1.h"
 
-ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
-	if (!lineptr || !n || !stream) return -1;
-
-	int ch;
-	size_t pos = 0;
-
-	if (*lineptr == NULL) {
-		*n = 128;
-		*lineptr = malloc(*n);
-		if (!*lineptr) return -1;
-	}
-
-	while ((ch = fgetc(stream)) != EOF && ch != '\n') {
-		if (pos + 1 >= *n) {// Увеличение буфера при необходимости
-			*n *= 2;
-			char *new_ptr = realloc(*lineptr, *n);
-			if (!new_ptr) return -1;
-			*lineptr = new_ptr;
-		}
-		(*lineptr)[pos++] = ch;
-	}
-
-	if (pos == 0 && ch == EOF) return -1;// Если сразу EOF, вернуть -1
-
-	(*lineptr)[pos] = '\0';// Завершаем строку
-	return pos;
-}
 
 void HandlePrint(char code, const char *format, ...) {
 	va_list args;
@@ -36,7 +9,7 @@ void HandlePrint(char code, const char *format, ...) {
 }
 
 void GetValidData(char *username, int *pin) {
-	char input[10];// Буфер с запасом
+	char input[10];
 	char pin_input[10];
 
 	while (1) {

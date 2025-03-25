@@ -25,12 +25,15 @@ int main() {
 	sem_id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
 	if (sem_id == -1) {
 		HandlePrint(1, "Failed to create semaphore.");
+		free(users);
 		return 1;
 	}
+
 	union semun sem_union;
 	sem_union.val = 1;
 	if (semctl(sem_id, 0, SETVAL, sem_union) == -1) {
 		HandlePrint(1, "Failed to initialize semaphore.");
+		free(users);
 		return 1;
 	}
 
@@ -76,5 +79,11 @@ int main() {
 				HandlePrint(0, "Incorrect choice.\n");
 		}
 	}
+
+	if (semctl(sem_id, 0, IPC_RMID) == -1) {
+		HandlePrint(1, "semctl IPC_RMID failed");
+		return 1;
+	}
+
 	return 0;
 }
