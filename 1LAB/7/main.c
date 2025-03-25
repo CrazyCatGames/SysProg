@@ -10,13 +10,13 @@
 #include <linux/fs.h>
 
 char FileType(mode_t mode) {
-	if (S_ISDIR(mode)) return 'd';
-	if (S_ISREG(mode)) return '-';
-	if (S_ISLNK(mode)) return 'l';
-	if (S_ISCHR(mode)) return 'c';
-	if (S_ISBLK(mode)) return 'b';
-	if (S_ISFIFO(mode)) return 'p';
-	if (S_ISSOCK(mode)) return 's';
+	if (S_ISDIR(mode)) return 'd';  //Dir
+	if (S_ISREG(mode)) return '-';  //File
+	if (S_ISLNK(mode)) return 'l';  //Symbol link
+	if (S_ISCHR(mode)) return 'c';  //Symbol device
+	if (S_ISBLK(mode)) return 'b';  //Block device
+	if (S_ISFIFO(mode)) return 'p'; //Named pipe
+	if (S_ISSOCK(mode)) return 's'; //Socket
 	return '?';
 }
 
