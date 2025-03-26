@@ -58,6 +58,30 @@ void XorN(const char *filename, int N) {
 		return;
 	}
 
+	if (N == 2) {
+		unsigned char result = 0;
+		int nibble_count = 0;
+		int c;
+		while ((c = fgetc(fp)) != EOF) {
+			unsigned char byte = (unsigned char)c;
+			unsigned char high = byte >> 4;
+			unsigned char low = byte & 0x0F;
+
+			result ^= high;
+			nibble_count++;
+			result ^= low;
+			nibble_count++;
+		}
+
+		if (nibble_count % 2 != 0) {
+			result ^= (PAD_VALUE & 0x0F);
+		}
+
+		HandlePrint(0, "Xor2 result for %s: %01X\n", filename, result);
+		fclose(fp);
+		return;
+	}
+
 	int block_bits = 1 << N;
 	int block_bytes = (block_bits + 7) / 8;
 
