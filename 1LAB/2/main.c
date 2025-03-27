@@ -34,6 +34,12 @@ int main(int argc, char *argv[]) {
 			}
 			XorN(argv[i], N);
 		} else if (strcmp(operation, "mask") == 0) {
+			if (!IsValidHex(argument)) {
+				HandlePrint(1, "Mask must include only 0-9, a-f, A-F\n");
+				free(argument);
+				return 1;
+			}
+
 			uint32_t hex_mask = strtoul(argument, NULL, 16);
 			Mask(argv[i], hex_mask);
 		} else if (strncmp(operation, "copy", 4) == 0) {

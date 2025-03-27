@@ -1,5 +1,15 @@
 #include "../include/2.h"
 
+int IsValidHex(const char *str) {
+	if (!str || *str == '\0') return 0;  // Пустая строка недопустима
+	while (*str) {
+		if (!isxdigit((unsigned char)*str)) {
+			return 0;  // Недопустимый символ
+		}
+		str++;
+	}
+	return 1;  // Все символы корректны
+}
 
 void HandlePrint(char code, const char *format, ...) {
 	va_list args;
