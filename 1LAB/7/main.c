@@ -20,6 +20,24 @@ char FileType(mode_t mode) {
 	return '?';
 }
 
+int GetFirstBlock(const char *path) {
+	int fd = open(path, O_RDONLY);
+	if (fd == -1) {
+		perror("Error opening file");
+		return -1;
+	}
+
+	int block = 0;
+	if (ioctl(fd, FIBMAP, &block) == -1) {
+		perror("ioctl(FIBMAP)");
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+	return block;
+}
+
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		fprintf(stderr, "Use: %s <directory> [<directory> ...]\n", argv[0]);
@@ -44,10 +62,16 @@ int main(int argc, char *argv[]) {
 
 			struct stat st;
 			if (lstat(path, &st) == -1) {
-				perror("lstat\n");
+				perror("lstat");
 				continue;
 			}
-			printf("%c %lu %s\n", FileType(st.st_mode), st.st_ino, current_dir->d_name);
+
+			int first_block = -1;
+			if (S_ISREG(st.st_mode)) {
+				first_block = GetFirstBlock(path);
+			}
+
+			printf("%c %lu %d %s\n", FileType(st.st_mode), st.st_ino, first_block, current_dir->d_name);
 		}
 		closedir(dir);
 		printf("\n");
