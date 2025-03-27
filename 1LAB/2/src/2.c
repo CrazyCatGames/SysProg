@@ -1,14 +1,13 @@
 #include "../include/2.h"
 
+
 int IsValidHex(const char *str) {
-	if (!str || *str == '\0') return 0;  // Пустая строка недопустима
+	if (!str || *str == '\0') return 0;
 	while (*str) {
-		if (!isxdigit((unsigned char)*str)) {
-			return 0;  // Недопустимый символ
-		}
+		if (!isxdigit((unsigned char)*str)) return 0;
 		str++;
 	}
-	return 1;  // Все символы корректны
+	return 1;
 }
 
 void HandlePrint(char code, const char *format, ...) {
