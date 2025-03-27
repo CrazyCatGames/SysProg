@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 		if (strncmp(operation, "xor", 3) == 0) {
 			int N = atoi(operation + 3);
 			if (N < 2 || N > 6) {
-				HandlePrint(1, "N должно быть от 2 до 6\n");
+				HandlePrint(1, "N must be from 2 to 6\n");
 				free(argument);
 				return 1;
 			}

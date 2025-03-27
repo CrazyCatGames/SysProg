@@ -38,7 +38,7 @@ static int CopyFile(const char *src, const char *dest) {
 
 	char *buffer = (char *) malloc(buf_size * sizeof(char));
 	if (!buffer) {
-		perror("Malloc");
+		perror("Alloc error");
 		close(in_file);
 		close(out_file);
 		return -1;
@@ -47,7 +47,7 @@ static int CopyFile(const char *src, const char *dest) {
 	ssize_t n;
 	while ((n = read(in_file, buffer, buf_size)) > 0) {
 		if (write(out_file, buffer, n) != n) {
-			perror("Write");
+			perror("Error while writing");
 			close(in_file);
 			close(out_file);
 			free(buffer);
