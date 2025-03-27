@@ -29,9 +29,7 @@ int main() {
 		return 1;
 	}
 
-	union semun sem_union;
-	sem_union.val = 1;
-	if (semctl(sem_id, 0, SETVAL, sem_union) == -1) {
+	if (semctl(sem_id, 0, SETVAL, 1) == -1) {
 		HandlePrint(1, "Failed to initialize semaphore.");
 		free(users);
 		return 1;
