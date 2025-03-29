@@ -7,57 +7,77 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	char *operation = argv[argc - 1];
+	char operation[256];
 	char *argument = NULL;
-	size_t len = 0;
-
-	if (strcmp(operation, "mask") == 0 || strcmp(operation, "find") == 0) {
-		HandlePrint(0, "Enter argument: ");
-		if (getline(&argument, &len, stdin) == -1) {
-			perror("getline");
-			free(argument);
+	char *last_arg = argv[argc - 1];
+	char *bracket_open = strchr(last_arg, '<');
+	if (bracket_open) {
+		char *bracket_close = strrchr(last_arg, '>');
+		if (!bracket_close || bracket_close < bracket_open) {
+			HandlePrint(1, "Incorrect format for operation argument\n");
 			return 1;
 		}
-		size_t arg_len = strlen(argument);
-		if (arg_len > 0 && argument[arg_len - 1] == '\n') {
-			argument[arg_len - 1] = '\0';
+
+		size_t operation_len = bracket_open - last_arg;
+		if (operation_len >= sizeof(operation)) {
+			operation_len = sizeof(operation) - 1;
 		}
+
+		strncpy(operation, last_arg, operation_len);
+		operation[operation_len] = '\0';
+		argument = bracket_open + 1;
+		*bracket_close = '\0';
+	} else {
+		strncpy(operation, last_arg, sizeof(operation) - 1);
+		operation[sizeof(operation) - 1] = '\0';
 	}
 
 	for (int i = 1; i < argc - 1; i++) {
 		if (strncmp(operation, "xor", 3) == 0) {
-			int N = atoi(operation + 3);
-			if (N < 2 || N > 6) {
+			int n = atoi(operation + 3);
+			if (n < 2 || n > 6) {
 				HandlePrint(1, "N must be from 2 to 6\n");
-				free(argument);
-				return 1;
-			}
-			XorN(argv[i], N);
-		} else if (strcmp(operation, "mask") == 0) {
-			if (!IsValidHex(argument)) {
-				HandlePrint(1, "Mask must include only 0-9, a-f, A-F\n");
-				free(argument);
 				return 1;
 			}
 
-			uint32_t hex_mask = strtoul(argument, NULL, 16);
+			XorN(argv[i], n);
+		} else if (strcmp(operation, "mask") == 0) {
+			if (!argument) {
+				HandlePrint(1, "Missing mask argument\n");
+				return 1;
+			}
+
+			uint32_t hex_mask;
+			if (IsValidHex(argument)) {
+				sscanf(argument, "%x", &hex_mask);
+				hex_mask = SwapEndian(hex_mask);
+			} else {
+				HandlePrint(1, "Mask must include only 0-9, a-f, A-F\n");
+				return 1;
+			}
+
 			Mask(argv[i], hex_mask);
 		} else if (strncmp(operation, "copy", 4) == 0) {
-			int N = atoi(operation + 4);
-			if (N <= 0) {
+			int n = atoi(operation + 4);
+			if (n <= 0) {
 				HandlePrint(1, "Number of copies must be positive\n");
 				continue;
 			}
-			CopyN(argv[i], N);
+
+			CopyN(argv[i], n);
 		} else if (strcmp(operation, "find") == 0) {
+			if (!argument) {
+				HandlePrint(1, "Missing find argument\n");
+				return 1;
+			}
+
+			Parse(argument);
 			FindString(argv[i], argument);
 		} else {
 			HandlePrint(1, "Unknown operation: %s\n", operation);
-			free(argument);
 			return 1;
 		}
 	}
-
-	free(argument);
 	return 0;
+
 }

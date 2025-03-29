@@ -1,10 +1,29 @@
 #include "../include/2.h"
 
+uint32_t SwapEndian(uint32_t value) {
+	return ((value & 0xFF000000) >> 24) |
+		   ((value & 0x00FF0000) >> 8) |
+		   ((value & 0x0000FF00) << 8) |
+		   ((value & 0x000000FF) << 24);
+}
+
+void Parse(char *str) {
+	char *src = str, *dst = str;
+	while (*src) {
+		if (src[0] == '\\' && src[1] == 'n') {
+			*dst++ = '\n';
+			src += 2;
+		} else {
+			*dst++ = *src++;
+		}
+	}
+	*dst = '\0';
+}
 
 int IsValidHex(const char *str) {
 	if (!str || *str == '\0') return 0;
 	while (*str) {
-		if (!isxdigit((unsigned char)*str)) return 0;
+		if (!isxdigit((unsigned char) *str)) return 0;
 		str++;
 	}
 	return 1;
@@ -17,7 +36,50 @@ void HandlePrint(char code, const char *format, ...) {
 	va_end(args);
 }
 
-static int CopyFile(const char *src, const char *dest) {
+char SearchInFiles(const char *filename, const char *substring) {
+	size_t len_substr = strlen(substring);
+	FILE *file = fopen(filename, "r");
+	if (!file) {
+		perror("Error of opening file\n");
+		return -1;
+	}
+
+	int c;
+	int n_char = 0, n_line = 1;
+	int idx = 0;
+	int n_line_answ = 0;
+
+	while ((c = getc(file)) != EOF) {
+		n_char++;
+		if (c == '\n') {
+			n_line++;
+			n_char = 0;
+		}
+
+		if (c == substring[idx]) {
+			idx++;
+			if (idx == 1) {
+				n_line_answ = n_line;
+			}
+
+			if (idx == len_substr) {
+				return 0;
+			}
+		} else if (idx > 0) {
+			fseek(file, -idx + 1, SEEK_CUR);
+
+			n_char -= (idx - 1);
+			if (n_line != n_line_answ) {
+				n_line = n_line_answ + 1;
+			}
+			idx = 0;
+		}
+	}
+
+	return 1;
+}
+
+int CopyFile(const char *src, const char *dest) {
 	int in_file = open(src, O_RDONLY);
 	if (in_file < 0) {
 		perror("Open source file");
@@ -30,33 +92,24 @@ static int CopyFile(const char *src, const char *dest) {
 		return -1;
 	}
 
-	struct stat st;
-	size_t buf_size = 4096;
-	if (fstat(in_file, &st) == 0 && st.st_size > 0) {
-		buf_size = st.st_size;
-	}
-
-	char *buffer = (char *) malloc(buf_size * sizeof(char));
-	if (!buffer) {
-		perror("Alloc error");
-		close(in_file);
-		close(out_file);
-		return -1;
-	}
-
-	ssize_t n;
-	while ((n = read(in_file, buffer, buf_size)) > 0) {
-		if (write(out_file, buffer, n) != n) {
-			perror("Error while writing");
+	int buffer[4096];
+	ssize_t bytes_read;
+	while ((bytes_read = read(in_file, buffer, sizeof(buffer))) > 0) {
+		ssize_t BytesWritten = write(out_file, buffer, bytes_read);
+		if (BytesWritten != bytes_read) {
+			perror("Error writing to file");
 			close(in_file);
 			close(out_file);
-			free(buffer);
 			return -1;
 		}
 	}
+
+	if (bytes_read < 0) {
+		perror("Error reading from file");
+	}
+
 	close(in_file);
 	close(out_file);
-	free(buffer);
 	return 0;
 }
 
@@ -72,7 +125,7 @@ void XorN(const char *filename, int N) {
 		int nibble_count = 0;
 		int c;
 		while ((c = fgetc(fp)) != EOF) {
-			unsigned char byte = (unsigned char)c;
+			unsigned char byte = (unsigned char) c;
 			unsigned char high = byte >> 4;
 			unsigned char low = byte & 0x0F;
 
@@ -133,31 +186,13 @@ void Mask(const char *filename, uint32_t hex_mask) {
 	}
 	uint32_t number;
 	int count = 0;
-	unsigned char buf[4];
 
-	while (fread(buf, 1, 4, fp) == 4) {
-		number = ((uint32_t) buf[0] << 24) | ((uint32_t) buf[1] << 16) |
-				 ((uint32_t) buf[2] << 8) | ((uint32_t) buf[3]);
+	while (fread(&number, sizeof(uint32_t), 1, fp) == 1) {
 		if ((number & hex_mask) == hex_mask) {
 			count++;
 		}
 	}
 
-	int remain = 0;
-	while (remain < 4) {
-		int c = fgetc(fp);
-		if (c == EOF) break;
-		buf[remain++] = (unsigned char) c;
-	}
-
-	if (remain > 0 && remain < 4) {
-		memset(buf + remain, PAD_VALUE, 4 - remain);
-		number = ((uint32_t) buf[0] << 24) | ((uint32_t) buf[1] << 16) |
-				 ((uint32_t) buf[2] << 8) | ((uint32_t) buf[3]);
-		if ((number & hex_mask) == hex_mask) {
-			count++;
-		}
-	}
 	fclose(fp);
 	HandlePrint(0, "Mask 0x%X count for %s: %d\n", hex_mask, filename, count);
 }
@@ -169,8 +204,14 @@ void CopyN(const char *filename, int N) {
 			perror("Error while forking\n");
 			continue;
 		} else if (pid == 0) {
-			char dest[512];
-			snprintf(dest, sizeof(dest), "%s_copy%d", filename, i);
+			char dest[PATH_MAX];
+			char *dot = strrchr(filename, '.');
+			if (dot) {
+				snprintf(dest, sizeof(dest), "%.*s_copy%d%s", (int) (dot - filename), filename, i, dot);
+			} else {
+				snprintf(dest, sizeof(dest), "%s_copy%d", filename, i);
+			}
+
 			if (CopyFile(filename, dest) == 0) {
 				HandlePrint(0, "Created copy: %s\n", dest);
 			} else {
@@ -190,28 +231,10 @@ void FindString(const char *filename, const char *search_str) {
 		perror("Error while forking\n");
 		return;
 	} else if (pid == 0) {
-		FILE *fp = fopen(filename, "r");
-		if (!fp) {
-			perror("Error of opening file\n");
-			exit(1);
-		}
-
-		char *line = NULL;
-		size_t len = 0;
-		ssize_t read;
-		int found = 0;
-		while ((read = getline(&line, &len, fp)) != -1) {
-			if (strstr(line, search_str) != NULL) {
-				found = 1;
-				break;
-			}
-		}
-		free(line);
-		fclose(fp);
-
-		if (found) {
+		char code = SearchInFiles(filename, search_str);
+		if (code == 0) {
 			HandlePrint(0, "String '%s' found in %s\n", search_str, filename);
-		} else {
+		} else if (code != -1) {
 			HandlePrint(1, "String '%s' not found in %s\n", search_str, filename);
 		}
 		exit(0);
